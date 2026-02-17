@@ -6,7 +6,6 @@ import (
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
-
 	"github.com/gin-gonic/gin"
 )
 
