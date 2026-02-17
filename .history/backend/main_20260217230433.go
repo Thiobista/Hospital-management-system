@@ -7,10 +7,9 @@ import (
 	"clinic-backend/internal/models"
 	"clinic-backend/internal/routes"
 
-	"time"
-
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-contrib/cors"
+	"time"
 )
 
 func main() {
@@ -26,11 +25,11 @@ func main() {
 			"http://localhost:3000",
 			"https://hospital-management-system-lake-theta.vercel.app",
 		},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
+		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders: []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders: []string{"Content-Length"},
 		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
+		MaxAge: 12 * time.Hour,
 	}))
 
 	routes.SetupRoutes(r)
