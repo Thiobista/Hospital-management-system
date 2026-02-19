@@ -17,7 +17,16 @@ func main() {
 	config.ConnectDB()
 
 	// Auto migrate DB tables
-	config.DB.AutoMigrate(&models.User{}, &models.Patient{}, &models.Appointment{})
+	config.DB.AutoMigrate(
+		&models.User{},
+		&models.Patient{},
+		&models.Doctor{},
+		&models.Appointment{},
+		&models.MedicalRecord{},
+		&models.Prescription{},
+		&models.Bill{},
+		&models.Room{},
+	)
 
 	r := gin.Default()
 

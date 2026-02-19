@@ -15,30 +15,68 @@ import (
 
 func Register(c *gin.Context) {
 	var user models.User
-	c.BindJSON(&user)
+	if err := c.ShouldBindJSON(&user); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-	hash, _ := bcrypt.GenerateFromPassword([]byte(user.Password), 10)
+	// Set default role if not provided
+	if user.Role == "" {
+		user.Role = "patient"
+	}
+
+	// Validate role
+	validRoles := map[string]bool{
+		"admin":        true,
+		"doctor":       true,
+		"receptionist": true,
+		"patient":      true,
+	}
+	if !validRoles[user.Role] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role. Must be: admin, doctor, receptionist, or patient"})
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), 10)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
 	user.Password = string(hash)
 
-	config.DB.Create(&user)
-	c.JSON(200, gin.H{"message": "User registered"})
+	if err := config.DB.Create(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user. Email may already exist."})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "User registered successfully", "id": user.ID})
 }
 
 func Login(c *gin.Context) {
-	var body models.User
+	var body struct {
+		Email    string `json:"email" binding:"required"`
+		Password string `json:"password" binding:"required"`
+	}
 	var user models.User
 
-	c.BindJSON(&body)
-	config.DB.Where("email = ?", body.Email).First(&user)
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Email and password are required"})
+		return
+	}
+
+	if err := config.DB.Where("email = ?", body.Email).First(&user).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+		return
+	}
 
 	if user.ID == 0 {
-		c.JSON(401, gin.H{"error": "User not found"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
 		return
 	}
 
 	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(body.Password))
 	if err != nil {
-		c.JSON(401, gin.H{"error": "Wrong password"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
 		return
 	}
 
@@ -48,6 +86,19 @@ func Login(c *gin.Context) {
 		"exp":  time.Now().Add(time.Hour * 24).Unix(),
 	})
 
-	tokenString, _ := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
-	c.JSON(http.StatusOK, gin.H{"token": tokenString})
+	tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"token": tokenString,
+		"user": gin.H{
+			"id":    user.ID,
+			"name":  user.Name,
+			"email": user.Email,
+			"role":  user.Role,
+		},
+	})
 }

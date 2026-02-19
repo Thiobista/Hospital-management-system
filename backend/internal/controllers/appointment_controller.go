@@ -6,6 +6,7 @@ import (
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -33,7 +34,33 @@ func CreateAppointment(c *gin.Context) {
 
 func GetAppointments(c *gin.Context) {
 	var appointments []models.Appointment
-	if err := config.DB.Order("date DESC").Find(&appointments).Error; err != nil {
+	query := config.DB.Preload("Patient").Preload("Doctor").Order("date DESC")
+
+	// Filter by patient if provided
+	if patientID := c.Query("patientId"); patientID != "" {
+		query = query.Where("patient_id = ?", patientID)
+	}
+
+	// Filter by doctor if provided
+	if doctorID := c.Query("doctorId"); doctorID != "" {
+		query = query.Where("doctor_id = ?", doctorID)
+	}
+
+	// Filter by status if provided
+	if status := c.Query("status"); status != "" {
+		query = query.Where("status = ?", status)
+	}
+
+	// If user is a doctor, only show their appointments
+	userRole, exists := c.Get("userRole")
+	if exists && userRole == "doctor" {
+		userID, _ := c.Get("userID")
+		// Note: This assumes doctor user ID matches doctor ID
+		// You may need to adjust based on your user-doctor relationship
+		query = query.Where("doctor_id = ?", userID)
+	}
+
+	if err := query.Find(&appointments).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch appointments"})
 		return
 	}
@@ -48,7 +75,7 @@ func GetAppointmentByID(c *gin.Context) {
 	}
 
 	var appointment models.Appointment
-	if err := config.DB.First(&appointment, id).Error; err != nil {
+	if err := config.DB.Preload("Patient").Preload("Doctor").First(&appointment, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Appointment not found"})
 		return
 	}
@@ -79,6 +106,7 @@ func UpdateAppointment(c *gin.Context) {
 		return
 	}
 
+	config.DB.Preload("Patient").Preload("Doctor").First(&appointment, appointment.ID)
 	c.JSON(http.StatusOK, appointment)
 }
 
